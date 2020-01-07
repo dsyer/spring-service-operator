@@ -19,7 +19,7 @@ import (
 	"flag"
 	"os"
 
-	api "github.com/dsyer/spring-boot-operator/api/v1"
+	api "github.com/dsyer/spring-service-operator/api/v1"
 	"github.com/dsyer/spring-service-operator/controllers"
 	"github.com/go-logr/logr"
 	apps "k8s.io/api/apps/v1"
@@ -94,6 +94,6 @@ func createRecorder(log logr.Logger, mgr ctrl.Manager) record.EventRecorder {
 	eventBroadcaster := record.NewBroadcaster()
 	// eventBroadcaster.StartLogging(log.Info)
 	eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: kubeclientset.CoreV1().Events("")})
-	recorder := eventBroadcaster.NewRecorder(clientgoscheme.Scheme, corev1.EventSource{Component: "spring-boot-operator"})
+	recorder := eventBroadcaster.NewRecorder(clientgoscheme.Scheme, corev1.EventSource{Component: "spring-service-operator"})
 	return recorder
 }

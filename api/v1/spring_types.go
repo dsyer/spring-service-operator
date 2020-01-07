@@ -21,7 +21,7 @@ import (
 
 // ProxyServiceSpec defines the desired state of ProxyService
 type ProxyServiceSpec struct {
-	Services []string `json:"sevices,omitempty"`
+	Services []string `json:"services,omitempty"`
 }
 
 // ProxyServiceStatus defines the observed state of ProxyService

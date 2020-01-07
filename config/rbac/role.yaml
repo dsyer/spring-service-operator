@@ -9,31 +9,7 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - configmaps
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
   - events
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - secrets
   verbs:
   - create
   - delete
@@ -67,21 +43,9 @@ rules:
   - update
   - watch
 - apiGroups:
-  - batch
+  - spring.io
   resources:
-  - cronjobs
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - batch
-  resources:
-  - jobs
+  - proxyservices
   verbs:
   - create
   - delete
@@ -93,44 +57,8 @@ rules:
 - apiGroups:
   - spring.io
   resources:
-  - microservices
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - spring.io
-  resources:
-  - microservices/status
+  - proxyservices/status
   verbs:
   - get
   - patch
   - update
-- apiGroups:
-  - spring.io
-  resources:
-  - servicebindings
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - spring.io
-  resources:
-  - servicebindings/status
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch

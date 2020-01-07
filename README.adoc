@@ -1,6 +1,39 @@
 :toc:
 
-A Kubernetes operator for staging services.
+A Kubernetes operator for proxying HTTP services. Create a simple service quickly that proxies 1 or more other services, and control the traffic with an HTTP header.  you can deploy it to Kubernetes with just a few lines of YAML:
+
+```
+apiVersion: spring.io/v1
+kind: ProxyService
+metadata:
+  name: demo
+spec:
+  services:
+  - green
+  - blue
+```
+
+The result of applying this YAML is to create a new `Service` called `demo` that forwards HTTP requests to two existing services ("green" and "blue", which must exist). So set up a port forward:
+
+```
+$ kubectl port-forward svc/demo 8080:80
+Forwarding from 127.0.0.1:8080 -> 8080
+Forwarding from [::1]:8080 -> 8080
+```
+
+and then in another terminal
+
+```
+$ curl localhost:8080 -H "X-Server-Select: blue"
+Blue
+$ curl localhost:8080 -H "X-Server-Select: green"
+Green
+$ curl localhost:8080
+Green
+```
+
+
+Requests go to the first service listed by default, and can be sent to other services by adding an HTTP header `X-Server-Select` equal to the service name.
 
 == Installation
 

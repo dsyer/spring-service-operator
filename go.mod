@@ -3,7 +3,6 @@ module github.com/dsyer/spring-service-operator
 go 1.13
 
 require (
-	github.com/dsyer/spring-boot-operator v0.0.0-20191211115807-1e1a23cd6641
 	github.com/go-logr/logr v0.1.0
 	github.com/onsi/ginkgo v1.10.1
 	github.com/onsi/gomega v1.7.0

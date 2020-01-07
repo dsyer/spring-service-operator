@@ -1,7 +1,7 @@
-version: "2"
+version: "1"
 domain: spring.io
-repo: github.com/dsyer/spring-boot-operator
+repo: github.com/dsyer/spring-service-operator
 resources:
 - group: spring.io
   version: v1
-  kind: Microservice
+  kind: ProxyService

@@ -67,6 +67,12 @@ func (r *ProxyServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 	log.Info("Updating", "resource", proxy)
 
+	deployment, _, err := r.createAndUpdateDeploymentAndService(req, proxy)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	proxy.Status.Running = deployment.Status.AvailableReplicas > 0
+
 	if err := r.Status().Update(ctx, &proxy); err != nil {
 		if apierrors.IsConflict(err) {
 			log.Info("Unable to update status: reason conflict. Will retry on next event.")
@@ -106,12 +112,12 @@ func (r *ProxyServiceReconciler) createAndUpdateDeploymentAndService(req ctrl.Re
 			return deployment, service, err
 		}
 		if err := r.Create(ctx, deployment); err != nil {
-			log.Error(err, "Unable to create Deployment for micro", "deployment", deployment)
+			log.Error(err, "Unable to create Deployment for proxy", "deployment", deployment)
 			r.Recorder.Event(&proxy, corev1.EventTypeWarning, "ErrInvalidResource", fmt.Sprintf("Could not create Deployment: %s", err))
 			return deployment, service, err
 		}
 
-		log.Info("Created Deployments for micro", "deployment", deployment)
+		log.Info("Created Deployments for proxy", "deployment", deployment)
 		r.Recorder.Event(&proxy, corev1.EventTypeNormal, "DeploymentCreated", "Created Deployment")
 	} else {
 		// update if changed
@@ -122,13 +128,13 @@ func (r *ProxyServiceReconciler) createAndUpdateDeploymentAndService(req ctrl.Re
 				log.Info("Unable to update Deployment: reason conflict. Will retry on next event.")
 				err = nil
 			} else {
-				log.Error(err, "Unable to update Deployment for micro", "deployment", deployment)
+				log.Error(err, "Unable to update Deployment for proxy", "deployment", deployment)
 				r.Recorder.Event(&proxy, corev1.EventTypeWarning, "ErrInvalidResource", fmt.Sprintf("Could not update Deployment: %s", err))
 			}
 			return deployment, service, err
 		}
 
-		log.Info("Updated Deployments for micro", "deployment", deployment)
+		log.Info("Updated Deployments for proxy", "deployment", deployment)
 		r.Recorder.Event(&proxy, corev1.EventTypeNormal, "DeploymentUpdated", "Updated Deployment")
 	}
 
@@ -140,11 +146,11 @@ func (r *ProxyServiceReconciler) createAndUpdateDeploymentAndService(req ctrl.Re
 			return deployment, service, err
 		}
 		if err := r.Create(ctx, service); err != nil {
-			log.Error(err, "Unable to create Service for micro", "service", service)
+			log.Error(err, "Unable to create Service for proxy", "service", service)
 			return deployment, service, err
 		}
 
-		log.Info("Created Service for micro", "service", service)
+		log.Info("Created Service for proxy", "service", service)
 		r.Recorder.Event(&proxy, corev1.EventTypeNormal, "ServiceCreated", "Created Service")
 	} else {
 		// update if changed
@@ -155,13 +161,13 @@ func (r *ProxyServiceReconciler) createAndUpdateDeploymentAndService(req ctrl.Re
 				log.Info("Unable to update Service: reason conflict. Will retry on next event.")
 				err = nil
 			} else {
-				log.Error(err, "Unable to update Service for micro", "service", service)
+				log.Error(err, "Unable to update Service for proxy", "service", service)
 				r.Recorder.Event(&proxy, corev1.EventTypeWarning, "ErrInvalidResource", fmt.Sprintf("Could not update Service: %s", err))
 			}
 			return deployment, service, err
 		}
 
-		log.Info("Updated Service for micro", "service", service)
+		log.Info("Updated Service for proxy", "service", service)
 		r.Recorder.Event(&proxy, corev1.EventTypeNormal, "ServiceUpdated", "Updated Service")
 	}
 	return deployment, service, nil
@@ -189,9 +195,13 @@ func createDeployment(proxy *api.ProxyService) *apps.Deployment {
 				MatchLabels: map[string]string{"proxy": proxy.Name},
 			},
 			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"proxy": proxy.Name},
+				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						corev1.Container{
+							Name:  "nginx",
 							Image: "nginx",
 						},
 					},

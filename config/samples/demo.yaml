@@ -1,0 +1,87 @@
+apiVersion: spring.io/v1
+kind: ProxyService
+metadata:
+  name: demo
+spec:
+  services:
+  - green
+  - blue
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: blue
+  labels:
+    app: blue
+spec:
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+  selector:
+    app: blue
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: blue
+  name: blue
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: blue
+  template:
+    metadata:
+      labels:
+        app: blue
+    spec:
+      containers:
+      - image: springguides/demo
+        name: app
+        env:
+        - name: INFO_NAME
+          value: blue
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: green
+  labels:
+    app: green
+spec:
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+  selector:
+    app: green
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: green
+  name: green
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: green
+  template:
+    metadata:
+      labels:
+        app: green
+    spec:
+      containers:
+      - image: springguides/demo
+        name: app
+        env:
+        - name: INFO_NAME
+          value: green

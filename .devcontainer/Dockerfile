@@ -69,6 +69,8 @@ RUN apt-get update \
     && apt-get clean -y \
     && rm -rf /var/lib/apt/lists/* /go/src
 
+RUN os=linux arch=amd64 && curl -sL https://go.kubebuilder.io/dl/2.2.0/${os}/${arch} | tar -xz -C /tmp/ \
+    && mv /tmp/kubebuilder_2.2.0_${os}_${arch} /usr/local/kubebuilder
 ENV PATH /usr/local/kubebuilder/bin:$PATH
 
 # download kustomize

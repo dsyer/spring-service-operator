@@ -17,12 +17,15 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"testing"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	api "github.com/dsyer/spring-service-operator/api/v1"
+	apps "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -119,6 +122,9 @@ var _ = Describe("ProxyServiceReconciler", func() {
 			createCalls       int
 			statusUpdateErr   error
 			statusUpdateCalls int
+			serviceList		  []corev1.Service
+			configList		  []corev1.ConfigMap
+			deploymentList	  []apps.Deployment
 		)
 
 		BeforeEach(func() {
@@ -132,17 +138,26 @@ var _ = Describe("ProxyServiceReconciler", func() {
 			updateCalls = 0
 			update = func(_ context.Context, obj runtime.Object, opts ...client.UpdateOption) error {
 				updateCalls++
-				var ok bool
-				proxy, ok = obj.(*api.ProxyService)
-				Expect(ok).To(BeTrue())
-				Expect(opts).To(BeEmpty())
 				return updateErr
 			}
+			createErr = nil
+			createCalls = 0
 			create = func(_ context.Context, obj runtime.Object, opts ...client.CreateOption) error {
 				createCalls++
 				return createErr
 			}
+			listCalls = 0
+			listErr = nil
 			list = func(_ context.Context, obj runtime.Object, opts ...client.ListOption) error {
+				if services,ok := obj.(*corev1.ServiceList); ok {
+					services.Items = serviceList
+				}
+				if configs,ok := obj.(*corev1.ConfigMapList); ok {
+					configs.Items = configList
+				}
+				if deployments,ok := obj.(*apps.DeploymentList); ok {
+					deployments.Items = deploymentList
+				}
 				listCalls++
 				return listErr
 			}
@@ -164,17 +179,51 @@ var _ = Describe("ProxyServiceReconciler", func() {
 			}
 		})
 
-		It("should succeed and not be requeued", func() {
-			Expect(err).NotTo(HaveOccurred())
-			Expect(result.Requeue).To(BeFalse())
-			Expect(createCalls).To(Equal(3))
-			Expect(listCalls).To(Equal(3))
-			Expect(statusUpdateCalls).To(Equal(1))
+		Context("when the owned objects already exist", func() {
+			BeforeEach(func() {
+				serviceList = []corev1.Service{
+					corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: proxy.Name}},
+				}
+				configList = []corev1.ConfigMap{
+					corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("%s-config", proxy.Name)}},
+				}
+				deploymentList = []apps.Deployment{
+					apps.Deployment{ObjectMeta: metav1.ObjectMeta{Name: proxy.Name}},
+				}
+			})
+
+			It("should update them then succeed and not be requeued", func() {
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result.Requeue).To(BeFalse())
+				Expect(listCalls).To(Equal(3))
+				Expect(updateCalls).To(Equal(3))
+				Expect(createCalls).To(Equal(0))
+				Expect(statusUpdateCalls).To(Equal(1))
+			})
+
+		})
+
+		Context("when the owned objects do not already exist", func() {
+			BeforeEach(func() {
+				serviceList = []corev1.Service{}
+				configList = []corev1.ConfigMap{}
+				deploymentList = []apps.Deployment{}
+			})
+
+			It("should create them then succeed and not be requeued", func() {
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result.Requeue).To(BeFalse())
+				Expect(listCalls).To(Equal(3))
+				Expect(updateCalls).To(Equal(0))
+				Expect(createCalls).To(Equal(3))
+				Expect(statusUpdateCalls).To(Equal(1))
+			})
+	
 		})
 
 	})
 
-	Context("when the image map named by the request is not found", func() {
+	Context("when the proxy named by the request is not found", func() {
 		var notFoundErr error
 
 		BeforeEach(func() {

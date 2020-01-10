@@ -130,7 +130,31 @@ func (r *ProxyServiceReconciler) checkFinalizers(proxy *api.ProxyService) error 
 }
 
 func (r *ProxyServiceReconciler) deleteExternalResources(proxy *api.ProxyService) error {
+	var original corev1.Service
+	if err := r.Get(context.Background(), client.ObjectKey{Name: proxy.Name, Namespace: proxy.Namespace}, &original); err != nil {
+		if apierrors.IsNotFound(err) {
+			err = nil
+		}
+		return err
+	}
+	var service corev1.Service
+	if err := r.Get(context.Background(), client.ObjectKey{Name: proxy.Spec.Services[0], Namespace: proxy.Namespace}, &service); err != nil {
+		if apierrors.IsNotFound(err) {
+			err = nil
+		}
+		return err
+	}
+	revertOriginalService(original, &service)
+	if err := r.Update(context.Background(), &service); err != nil {
+		return err
+	}
 	return nil
+}
+
+func revertOriginalService(original corev1.Service, service *corev1.Service) {
+	service.ObjectMeta.Labels = original.ObjectMeta.Labels
+	service.Spec.Selector = original.Spec.Selector
+	service.Spec.Ports = original.Spec.Ports
 }
 
 func containsString(slice []string, s string) bool {
@@ -371,10 +395,11 @@ func readMap(path string, proxy api.ProxyService) map[string]string {
 	for count, service := range proxy.Spec.Services {
 		if count == 0 {
 			services.Mappings["default"] = service
+			services.Upstreams[service] = proxy.Name
 		} else {
 			services.Mappings[service] = service
+			services.Upstreams[service] = service
 		}
-		services.Upstreams[service] = service
 	}
 	for _, file := range paths {
 		name := file.Name()
@@ -413,38 +438,56 @@ func updateConfig(config *corev1.ConfigMap, proxy *api.ProxyService) *corev1.Con
 	return config
 }
 
-func createService(proxy *api.ProxyService) *corev1.Service {
-	service := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels:    map[string]string{"proxy": proxy.Name},
-			Name:      proxy.Name,
-			Namespace: proxy.Namespace,
-		},
-		Spec: corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{
-				corev1.ServicePort{
-					Protocol:   "TCP",
-					Port:       80,
-					TargetPort: intstr.FromInt(80),
-					Name:       "http",
-				},
-			},
-			Selector: map[string]string{"proxy": proxy.Name},
-		},
-	}
-	return service
-}
-
 func updateService(service *corev1.Service, proxy *api.ProxyService) *corev1.Service {
 	return service
 }
 
 func (r *ProxyServiceReconciler) constructService(proxy *api.ProxyService) (*corev1.Service, error) {
-	service := createService(proxy)
-	if err := ctrl.SetControllerReference(proxy, service, r.Scheme); err != nil {
+	defaultServiceName := proxy.Spec.Services[0]
+	var existing corev1.Service
+	if err := r.Get(context.Background(), client.ObjectKey{Name: defaultServiceName, Namespace: proxy.Namespace}, &existing); err != nil {
+		// TODO: defer if not found without logging error
 		return nil, err
 	}
+	service := copyExistingService(proxy, existing)
+	modifyExistingService(proxy, &existing)
+	if err := r.Update(context.Background(), &existing); err != nil {
+		if !apierrors.IsConflict(err) {
+			return service, err
+		}
+	}
+	if err := ctrl.SetControllerReference(proxy, service, r.Scheme); err != nil {
+		return service, err
+	}
 	return service, nil
+}
+
+func modifyExistingService(proxy *api.ProxyService, service *corev1.Service) {
+	service.ObjectMeta.Labels["proxy"] = proxy.Name
+	service.Spec.Selector = map[string]string{"proxy": proxy.Name}
+	service.Spec.Ports = []corev1.ServicePort{
+		corev1.ServicePort{
+			Protocol:   "TCP",
+			Port:       80,
+			TargetPort: intstr.FromInt(80),
+			Name:       "http",
+		},
+	}
+}
+
+func copyExistingService(proxy *api.ProxyService, service corev1.Service) *corev1.Service {
+	result := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:    service.Labels,
+			Name:      proxy.Name,
+			Namespace: proxy.Namespace,
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: service.Spec.Ports,
+			Selector: service.Spec.Selector,
+		},
+	}
+	return result
 }
 
 // SetupWithManager Utility method to set up manager

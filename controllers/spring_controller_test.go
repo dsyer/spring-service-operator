@@ -37,8 +37,8 @@ func TestCreateConfig(t *testing.T) {
 		},
 	}
 	config := createConfig(proxy)
-	if config.Name != "demo-config" {
-		t.Errorf("config.Name = %s; want 'demo-config'", config.Name)
+	if config.GenerateName != "demo-" {
+		t.Errorf("config.GenerateName = %s; want 'demo-'", config.GenerateName)
 	}
 	if len(config.Data) != 0 {
 		t.Errorf("config.Data = %d; want 0", len(config.Data))
@@ -66,7 +66,7 @@ func TestCreateMap(t *testing.T) {
 	if !strings.Contains(config["proxy.conf"], "upstream green") {
 		t.Errorf("config['proxy.conf'] = %s; want 'upstream green'", config["proxy.conf"])
 	}
-	if !strings.Contains(config["proxy.conf"], "server green") {
+	if !strings.Contains(config["proxy.conf"], "server demo") {
 		t.Errorf("config['proxy.conf'] = %s; want 'server green'", config["proxy.conf"])
 	}
 	if !strings.Contains(config["proxy.conf"], "server blue") {

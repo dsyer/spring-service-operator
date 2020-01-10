@@ -43,8 +43,8 @@ func TestControllers(t *testing.T) {
 
 var _ = Describe("ProxyServiceReconciler", func() {
 	const (
-		testProxyService            = "myproxy"
-		testNamespace               = "namespace"
+		testProxyService = "myproxy"
+		testNamespace    = "namespace"
 	)
 
 	var (
@@ -56,7 +56,7 @@ var _ = Describe("ProxyServiceReconciler", func() {
 		list       func(context.Context, runtime.Object, ...client.ListOption) error
 		status     func() client.StatusWriter
 		result     ctrl.Result
-		scheme	   *runtime.Scheme
+		scheme     *runtime.Scheme
 		err        error
 		proxy      *api.ProxyService
 		// testErr    error
@@ -66,11 +66,14 @@ var _ = Describe("ProxyServiceReconciler", func() {
 		proxy = &api.ProxyService{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: "spring.io/v1",
-				Kind: "ProxyService",
+				Kind:       "ProxyService",
 			},
 			ObjectMeta: metav1.ObjectMeta{
-				Name:       testProxyService,
-				Namespace:  testNamespace,
+				Name:      testProxyService,
+				Namespace: testNamespace,
+			},
+			Spec: api.ProxyServiceSpec{
+				Services: []string{"green", "blue"},
 			},
 		}
 		scheme = runtime.NewScheme()
@@ -93,8 +96,8 @@ var _ = Describe("ProxyServiceReconciler", func() {
 					return status()
 				},
 			},
-			Log: ctrl.Log.WithName("testing"),
-			Scheme: scheme,
+			Log:      ctrl.Log.WithName("testing"),
+			Scheme:   scheme,
 			Recorder: testRecorder{},
 		}
 		req = ctrl.Request{
@@ -123,16 +126,30 @@ var _ = Describe("ProxyServiceReconciler", func() {
 			createCalls       int
 			statusUpdateErr   error
 			statusUpdateCalls int
-			serviceList		  []corev1.Service
-			configList		  []corev1.ConfigMap
-			deploymentList	  []apps.Deployment
+			serviceList       []corev1.Service
+			configList        []corev1.ConfigMap
+			deploymentList    []apps.Deployment
+			existingService   corev1.Service
 		)
 
 		BeforeEach(func() {
+			existingService = corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name: "green",
+				},
+			}
 			get = func(ctx context.Context, objectKey client.ObjectKey, out runtime.Object) error {
-				Expect(objectKey).To(Equal(req.NamespacedName))
-				outVal := reflect.ValueOf(out)
-				reflect.Indirect(outVal).Set(reflect.Indirect(reflect.ValueOf(proxy)))
+				if _, ok := out.(*api.ProxyService); ok {
+					Expect(objectKey).To(Equal(req.NamespacedName))
+					outVal := reflect.ValueOf(out)
+					reflect.Indirect(outVal).Set(reflect.Indirect(reflect.ValueOf(proxy)))
+				} else if _, ok := out.(*corev1.Service); ok {
+					if objectKey == req.NamespacedName || len(proxy.Spec.Services) > 0 && objectKey.Name == proxy.Spec.Services[0] {
+						outVal := reflect.ValueOf(out)
+						reflect.Indirect(outVal).Set(reflect.Indirect(reflect.ValueOf(existingService)))
+					}
+				}
 				return nil
 			}
 			updateErr = nil
@@ -153,13 +170,13 @@ var _ = Describe("ProxyServiceReconciler", func() {
 			listCalls = 0
 			listErr = nil
 			list = func(_ context.Context, obj runtime.Object, opts ...client.ListOption) error {
-				if services,ok := obj.(*corev1.ServiceList); ok {
+				if services, ok := obj.(*corev1.ServiceList); ok {
 					services.Items = serviceList
 				}
-				if configs,ok := obj.(*corev1.ConfigMapList); ok {
+				if configs, ok := obj.(*corev1.ConfigMapList); ok {
 					configs.Items = configList
 				}
-				if deployments,ok := obj.(*apps.DeploymentList); ok {
+				if deployments, ok := obj.(*apps.DeploymentList); ok {
 					deployments.Items = deploymentList
 				}
 				listCalls++
@@ -218,12 +235,12 @@ var _ = Describe("ProxyServiceReconciler", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(result.Requeue).To(BeFalse())
 				Expect(listCalls).To(Equal(3))
-				Expect(updateCalls).To(Equal(1))
+				Expect(updateCalls).To(Equal(2))
 				Expect(createCalls).To(Equal(3))
 				Expect(statusUpdateCalls).To(Equal(1))
 				Expect(len(proxy.ObjectMeta.Finalizers)).To(Equal(1))
 			})
-	
+
 		})
 
 		Context("when the proxy is not being deleted", func() {
@@ -236,13 +253,13 @@ var _ = Describe("ProxyServiceReconciler", func() {
 				Expect(len(proxy.ObjectMeta.Finalizers)).To(Equal(1))
 				Expect(createCalls).To(Equal(3))
 			})
-	
+
 		})
 
 		Context("when the proxy is being deleted", func() {
 			BeforeEach(func() {
 				proxy.ObjectMeta.Finalizers = []string{"spring.io/proxyservice"}
-				proxy.ObjectMeta.DeletionTimestamp = &metav1.Time{Time: time.Now(),}
+				proxy.ObjectMeta.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 			})
 
 			It("should remove the finalizer", func() {
@@ -250,7 +267,7 @@ var _ = Describe("ProxyServiceReconciler", func() {
 				Expect(len(proxy.ObjectMeta.Finalizers)).To(Equal(0))
 				Expect(createCalls).To(Equal(0))
 			})
-	
+
 		})
 
 	})
@@ -276,21 +293,24 @@ type testRecorder struct {
 
 func (r testRecorder) Event(object runtime.Object, eventtype, reason, message string) {}
 
-func (r testRecorder) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {}
+func (r testRecorder) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
+}
 
-func (r testRecorder) PastEventf(object runtime.Object, timestamp metav1.Time, eventtype, reason, messageFmt string, args ...interface{}) {}
+func (r testRecorder) PastEventf(object runtime.Object, timestamp metav1.Time, eventtype, reason, messageFmt string, args ...interface{}) {
+}
 
-func (r testRecorder) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {}
+func (r testRecorder) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
+}
 
 type testClient struct {
-	get    func(ctx context.Context, key client.ObjectKey, obj runtime.Object) error
-	list   func(ctx context.Context, list runtime.Object, opts ...client.ListOption) error
-	create func(ctx context.Context, obj runtime.Object, opts ...client.CreateOption) error
-	delete func(ctx context.Context, obj runtime.Object, opts ...client.DeleteOption) error
+	get         func(ctx context.Context, key client.ObjectKey, obj runtime.Object) error
+	list        func(ctx context.Context, list runtime.Object, opts ...client.ListOption) error
+	create      func(ctx context.Context, obj runtime.Object, opts ...client.CreateOption) error
+	delete      func(ctx context.Context, obj runtime.Object, opts ...client.DeleteOption) error
 	deleteAllOf func(ctx context.Context, obj runtime.Object, opts ...client.DeleteAllOfOption) error
-	update func(ctx context.Context, obj runtime.Object, opts ...client.UpdateOption) error
-	patch func(ctx context.Context, patch client.Patch, opts ...client.PatchOption) error
-	status func() client.StatusWriter
+	update      func(ctx context.Context, obj runtime.Object, opts ...client.UpdateOption) error
+	patch       func(ctx context.Context, patch client.Patch, opts ...client.PatchOption) error
+	status      func() client.StatusWriter
 }
 
 func (c testClient) Get(ctx context.Context, key client.ObjectKey, obj runtime.Object) error {

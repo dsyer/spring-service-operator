@@ -20,19 +20,20 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
+	api "github.com/dsyer/spring-service-operator/api/v1"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	api "github.com/dsyer/spring-service-operator/api/v1"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestControllers(t *testing.T) {
@@ -138,6 +139,9 @@ var _ = Describe("ProxyServiceReconciler", func() {
 			updateCalls = 0
 			update = func(_ context.Context, obj runtime.Object, opts ...client.UpdateOption) error {
 				updateCalls++
+				if updated, ok := obj.(*api.ProxyService); ok {
+					proxy = updated
+				}
 				return updateErr
 			}
 			createErr = nil
@@ -166,9 +170,9 @@ var _ = Describe("ProxyServiceReconciler", func() {
 			status = func() client.StatusWriter {
 				update := func(_ context.Context, obj runtime.Object, opts ...client.UpdateOption) error {
 					statusUpdateCalls++
-					updatedStatusImageMap, ok := obj.(*api.ProxyService)
+					updated, ok := obj.(*api.ProxyService)
 					Expect(ok).To(BeTrue())
-					proxy.Status = updatedStatusImageMap.Status
+					proxy.Status = updated.Status
 					Expect(opts).To(BeEmpty())
 					return statusUpdateErr
 				}
@@ -196,7 +200,7 @@ var _ = Describe("ProxyServiceReconciler", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(result.Requeue).To(BeFalse())
 				Expect(listCalls).To(Equal(3))
-				Expect(updateCalls).To(Equal(3))
+				Expect(updateCalls).To(Equal(4))
 				Expect(createCalls).To(Equal(0))
 				Expect(statusUpdateCalls).To(Equal(1))
 			})
@@ -214,9 +218,35 @@ var _ = Describe("ProxyServiceReconciler", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(result.Requeue).To(BeFalse())
 				Expect(listCalls).To(Equal(3))
-				Expect(updateCalls).To(Equal(0))
+				Expect(updateCalls).To(Equal(1))
 				Expect(createCalls).To(Equal(3))
 				Expect(statusUpdateCalls).To(Equal(1))
+				Expect(len(proxy.ObjectMeta.Finalizers)).To(Equal(1))
+			})
+	
+		})
+
+		Context("when the proxy is not being deleted", func() {
+			BeforeEach(func() {
+				proxy.ObjectMeta.Finalizers = []string{"spring.io/proxyservice"}
+			})
+
+			It("should not remove the finalizer", func() {
+				Expect(err).NotTo(HaveOccurred())
+				Expect(len(proxy.ObjectMeta.Finalizers)).To(Equal(1))
+			})
+	
+		})
+
+		Context("when the proxy is being deleted", func() {
+			BeforeEach(func() {
+				proxy.ObjectMeta.Finalizers = []string{"spring.io/proxyservice"}
+				proxy.ObjectMeta.DeletionTimestamp = &metav1.Time{Time: time.Now(),}
+			})
+
+			It("should remove the finalizer", func() {
+				Expect(err).NotTo(HaveOccurred())
+				Expect(len(proxy.ObjectMeta.Finalizers)).To(Equal(0))
 			})
 	
 		})

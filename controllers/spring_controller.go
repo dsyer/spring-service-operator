@@ -62,8 +62,8 @@ func (r *ProxyServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	ctx := context.Background()
 	log := r.Log.WithValues("ProxyService", req.NamespacedName)
 
-	var proxy api.ProxyService
-	if err := r.Get(ctx, req.NamespacedName, &proxy); err != nil {
+	proxy := &api.ProxyService{}
+	if err := r.Get(ctx, req.NamespacedName, proxy); err != nil {
 		err = client.IgnoreNotFound(err)
 		if err != nil {
 			log.Error(err, "Unable to fetch micro")
@@ -72,13 +72,17 @@ func (r *ProxyServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 	log.Info("Updating", "resource", proxy)
 
-	deployment, _, err := r.createAndUpdateDeploymentAndService(req, proxy)
+	if err := r.checkFinalizers(proxy); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	deployment, _, err := r.createAndUpdateDeploymentAndService(req, *proxy)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 	proxy.Status.Running = deployment.Status.AvailableReplicas > 0
 
-	if err := r.Status().Update(ctx, &proxy); err != nil {
+	if err := r.Status().Update(ctx, proxy); err != nil {
 		if apierrors.IsConflict(err) {
 			log.Info("Unable to update status: reason conflict. Will retry on next event.")
 			err = nil
@@ -89,6 +93,60 @@ func (r *ProxyServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *ProxyServiceReconciler) checkFinalizers(proxy *api.ProxyService) error {
+
+	finalizerName := "spring.io/proxyservice"
+
+    // examine DeletionTimestamp to determine if object is under deletion
+    if proxy.ObjectMeta.DeletionTimestamp.IsZero() {
+        if !containsString(proxy.ObjectMeta.Finalizers, finalizerName) {
+            proxy.ObjectMeta.Finalizers = append(proxy.ObjectMeta.Finalizers, finalizerName)
+            if err := r.Update(context.Background(), proxy); err != nil {
+                return err
+            }
+        }
+    } else {
+        // The object is being deleted
+        if containsString(proxy.ObjectMeta.Finalizers, finalizerName) {
+            // our finalizer is present, so lets handle any external dependency
+            if err := r.deleteExternalResources(proxy); err != nil {
+                return err
+            }
+
+            // remove our finalizer from the list and update it.
+            proxy.ObjectMeta.Finalizers = removeString(proxy.ObjectMeta.Finalizers, finalizerName)
+            if err := r.Update(context.Background(), proxy); err != nil {
+                return err
+            }
+        }
+	}
+	
+	return nil
+}
+
+func (r *ProxyServiceReconciler) deleteExternalResources(proxy *api.ProxyService) error {
+	return nil
+}
+
+func containsString(slice []string, s string) bool {
+    for _, item := range slice {
+        if item == s {
+            return true
+        }
+    }
+    return false
+}
+
+func removeString(slice []string, s string) (result []string) {
+    for _, item := range slice {
+        if item == s {
+            continue
+        }
+        result = append(result, item)
+    }
+    return
 }
 
 func (r *ProxyServiceReconciler) createAndUpdateDeploymentAndService(req ctrl.Request, proxy api.ProxyService) (*apps.Deployment, *corev1.Service, error) {

@@ -46,6 +46,8 @@ spec:
         env:
         - name: INFO_NAME
           value: blue
+        - name: JAVA_TOOL_OPTIONS
+          value: -agentlib:jdwp=transport=dt_socket,server=y,address=5005,suspend=n,quiet=y
 ---
 
 apiVersion: v1
@@ -85,3 +87,5 @@ spec:
         env:
         - name: INFO_NAME
           value: green
+        - name: JAVA_TOOL_OPTIONS
+          value: -agentlib:jdwp=transport=dt_socket,server=y,address=5005,suspend=n,quiet=y

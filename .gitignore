@@ -22,4 +22,6 @@ bin
 *.swp
 *.swo
 *~
+.vscod/
+!.vscode/launch.json
 .attach_pid*

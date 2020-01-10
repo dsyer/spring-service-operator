@@ -102,30 +102,30 @@ func (r *ProxyServiceReconciler) checkFinalizers(proxy *api.ProxyService) error 
 
 	finalizerName := "spring.io/proxyservice"
 
-    // examine DeletionTimestamp to determine if object is under deletion
-    if proxy.ObjectMeta.DeletionTimestamp.IsZero() {
-        if !containsString(proxy.ObjectMeta.Finalizers, finalizerName) {
-            proxy.ObjectMeta.Finalizers = append(proxy.ObjectMeta.Finalizers, finalizerName)
-            if err := r.Update(context.Background(), proxy); err != nil {
-                return err
-            }
-        }
-    } else {
-        // The object is being deleted
-        if containsString(proxy.ObjectMeta.Finalizers, finalizerName) {
-            // our finalizer is present, so lets handle any external dependency
-            if err := r.deleteExternalResources(proxy); err != nil {
-                return err
-            }
+	// examine DeletionTimestamp to determine if object is under deletion
+	if proxy.ObjectMeta.DeletionTimestamp.IsZero() {
+		if !containsString(proxy.ObjectMeta.Finalizers, finalizerName) {
+			proxy.ObjectMeta.Finalizers = append(proxy.ObjectMeta.Finalizers, finalizerName)
+			if err := r.Update(context.Background(), proxy); err != nil {
+				return err
+			}
+		}
+	} else {
+		// The object is being deleted
+		if containsString(proxy.ObjectMeta.Finalizers, finalizerName) {
+			// our finalizer is present, so lets handle any external dependency
+			if err := r.deleteExternalResources(proxy); err != nil {
+				return err
+			}
 
-            // remove our finalizer from the list and update it.
-            proxy.ObjectMeta.Finalizers = removeString(proxy.ObjectMeta.Finalizers, finalizerName)
-            if err := r.Update(context.Background(), proxy); err != nil {
-                return err
-            }
-        }
+			// remove our finalizer from the list and update it.
+			proxy.ObjectMeta.Finalizers = removeString(proxy.ObjectMeta.Finalizers, finalizerName)
+			if err := r.Update(context.Background(), proxy); err != nil {
+				return err
+			}
+		}
 	}
-	
+
 	return nil
 }
 
@@ -134,22 +134,22 @@ func (r *ProxyServiceReconciler) deleteExternalResources(proxy *api.ProxyService
 }
 
 func containsString(slice []string, s string) bool {
-    for _, item := range slice {
-        if item == s {
-            return true
-        }
-    }
-    return false
+	for _, item := range slice {
+		if item == s {
+			return true
+		}
+	}
+	return false
 }
 
 func removeString(slice []string, s string) (result []string) {
-    for _, item := range slice {
-        if item == s {
-            continue
-        }
-        result = append(result, item)
-    }
-    return
+	for _, item := range slice {
+		if item == s {
+			continue
+		}
+		result = append(result, item)
+	}
+	return
 }
 
 func (r *ProxyServiceReconciler) createAndUpdateDeploymentAndService(req ctrl.Request, proxy api.ProxyService) (*apps.Deployment, *corev1.Service, error) {
@@ -210,39 +210,6 @@ func (r *ProxyServiceReconciler) createAndUpdateDeploymentAndService(req ctrl.Re
 		r.Recorder.Event(&proxy, corev1.EventTypeNormal, "ConfigMapUpdated", "Updated ConfigMap")
 	}
 
-	log.Info("Found services", "services", len(services.Items))
-	if len(services.Items) == 0 {
-		var err error
-		service, err = r.constructService(&proxy)
-		if err != nil {
-			return deployment, service, err
-		}
-		if err := r.Create(ctx, service); err != nil {
-			log.Error(err, "Unable to create Service for proxy", "service", service)
-			return deployment, service, err
-		}
-
-		log.Info("Created Service for proxy", "service", service)
-		r.Recorder.Event(&proxy, corev1.EventTypeNormal, "ServiceCreated", "Created Service")
-	} else {
-		// update if changed
-		service = &services.Items[0]
-		service = updateService(service, &proxy)
-		if err := r.Update(ctx, service); err != nil {
-			if apierrors.IsConflict(err) {
-				log.Info("Unable to update Service: reason conflict. Will retry on next event.")
-				err = nil
-			} else {
-				log.Error(err, "Unable to update Service for proxy", "service", service)
-				r.Recorder.Event(&proxy, corev1.EventTypeWarning, "ErrInvalidResource", fmt.Sprintf("Could not update Service: %s", err))
-			}
-			return deployment, service, err
-		}
-
-		log.Info("Updated Service for proxy", "service", service)
-		r.Recorder.Event(&proxy, corev1.EventTypeNormal, "ServiceUpdated", "Updated Service")
-	}
-
 	if len(deployments.Items) == 0 {
 		var err error
 		deployment, err = r.constructDeployment(&proxy, config)
@@ -276,6 +243,39 @@ func (r *ProxyServiceReconciler) createAndUpdateDeploymentAndService(req ctrl.Re
 		r.Recorder.Event(&proxy, corev1.EventTypeNormal, "DeploymentUpdated", "Updated Deployment")
 	}
 
+	log.Info("Found services", "services", len(services.Items))
+	if len(services.Items) == 0 {
+		var err error
+		service, err = r.constructService(&proxy)
+		if err != nil {
+			return deployment, service, err
+		}
+		if err := r.Create(ctx, service); err != nil {
+			log.Error(err, "Unable to create Service for proxy", "service", service)
+			return deployment, service, err
+		}
+
+		log.Info("Created Service for proxy", "service", service)
+		r.Recorder.Event(&proxy, corev1.EventTypeNormal, "ServiceCreated", "Created Service")
+	} else {
+		// update if changed
+		service = &services.Items[0]
+		service = updateService(service, &proxy)
+		if err := r.Update(ctx, service); err != nil {
+			if apierrors.IsConflict(err) {
+				log.Info("Unable to update Service: reason conflict. Will retry on next event.")
+				err = nil
+			} else {
+				log.Error(err, "Unable to update Service for proxy", "service", service)
+				r.Recorder.Event(&proxy, corev1.EventTypeWarning, "ErrInvalidResource", fmt.Sprintf("Could not update Service: %s", err))
+			}
+			return deployment, service, err
+		}
+
+		log.Info("Updated Service for proxy", "service", service)
+		r.Recorder.Event(&proxy, corev1.EventTypeNormal, "ServiceUpdated", "Updated Service")
+	}
+
 	return deployment, service, nil
 }
 
@@ -302,9 +302,9 @@ func (r *ProxyServiceReconciler) constructDeployment(proxy *api.ProxyService, co
 func createDeployment(proxy api.ProxyService, config corev1.ConfigMap) *apps.Deployment {
 	deployment := &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:    map[string]string{"proxy": proxy.Name},
-			Name:      proxy.Name,
-			Namespace: proxy.Namespace,
+			Labels:       map[string]string{"proxy": proxy.Name},
+			GenerateName: proxy.Name + "-",
+			Namespace:    proxy.Namespace,
 		},
 		Spec: apps.DeploymentSpec{
 			Selector: &metav1.LabelSelector{
@@ -354,7 +354,7 @@ func createConfig(proxy api.ProxyService) *corev1.ConfigMap {
 	config := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: proxy.Name + "-",
-			Namespace: proxy.Namespace,
+			Namespace:    proxy.Namespace,
 		},
 		Data: data,
 	}

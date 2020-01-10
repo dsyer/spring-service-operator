@@ -463,7 +463,11 @@ func (r *ProxyServiceReconciler) constructService(proxy *api.ProxyService) (*cor
 }
 
 func modifyExistingService(proxy *api.ProxyService, service *corev1.Service) {
-	service.ObjectMeta.Labels["proxy"] = proxy.Name
+	if service.ObjectMeta.Labels != nil {
+		service.ObjectMeta.Labels["proxy"] = proxy.Name
+	} else {
+		service.ObjectMeta.Labels = map[string]string{"proxy": proxy.Name}
+	}
 	service.Spec.Selector = map[string]string{"proxy": proxy.Name}
 	service.Spec.Ports = []corev1.ServicePort{
 		corev1.ServicePort{

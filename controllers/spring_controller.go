@@ -185,11 +185,11 @@ func (r *ProxyServiceReconciler) createAndUpdateDeploymentAndService(req ctrl.Re
 			return deployment, service, err
 		}
 		if err := r.Create(ctx, config); err != nil {
-			log.Error(err, "Unable to create Service for proxy", "config", config)
+			log.Error(err, "Unable to create ConfigMap for proxy", "config", config)
 			return deployment, service, err
 		}
 
-		log.Info("Created Service for proxy", "config", config)
+		log.Info("Created ConfigMap for proxy", "config", config)
 		r.Recorder.Event(&proxy, corev1.EventTypeNormal, "ConfigMapCreated", "Created ConfigMap")
 	} else {
 		// update if changed
@@ -245,7 +245,7 @@ func (r *ProxyServiceReconciler) createAndUpdateDeploymentAndService(req ctrl.Re
 
 	if len(deployments.Items) == 0 {
 		var err error
-		deployment, err = r.constructDeployment(&proxy)
+		deployment, err = r.constructDeployment(&proxy, config)
 		if err != nil {
 			return deployment, service, err
 		}
@@ -290,8 +290,8 @@ func (r *ProxyServiceReconciler) constructConfig(proxy *api.ProxyService) (*core
 }
 
 // Create a Deployment for the proxyservice application
-func (r *ProxyServiceReconciler) constructDeployment(proxy *api.ProxyService) (*apps.Deployment, error) {
-	deployment := createDeployment(*proxy)
+func (r *ProxyServiceReconciler) constructDeployment(proxy *api.ProxyService, config *corev1.ConfigMap) (*apps.Deployment, error) {
+	deployment := createDeployment(*proxy, *config)
 	r.Log.Info("Deploying", "deployment", deployment)
 	if err := ctrl.SetControllerReference(proxy, deployment, r.Scheme); err != nil {
 		return nil, err
@@ -299,7 +299,7 @@ func (r *ProxyServiceReconciler) constructDeployment(proxy *api.ProxyService) (*
 	return deployment, nil
 }
 
-func createDeployment(proxy api.ProxyService) *apps.Deployment {
+func createDeployment(proxy api.ProxyService, config corev1.ConfigMap) *apps.Deployment {
 	deployment := &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:    map[string]string{"proxy": proxy.Name},
@@ -332,7 +332,7 @@ func createDeployment(proxy api.ProxyService) *apps.Deployment {
 							Name: "nginx",
 							VolumeSource: corev1.VolumeSource{
 								ConfigMap: &corev1.ConfigMapVolumeSource{
-									LocalObjectReference: corev1.LocalObjectReference{Name: fmt.Sprintf("%s-config", proxy.Name)},
+									LocalObjectReference: corev1.LocalObjectReference{Name: config.Name},
 								},
 							},
 						},
@@ -353,7 +353,7 @@ func createConfig(proxy api.ProxyService) *corev1.ConfigMap {
 	data := readMap("etc", proxy)
 	config := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-config", proxy.Name),
+			GenerateName: proxy.Name + "-",
 			Namespace: proxy.Namespace,
 		},
 		Data: data,

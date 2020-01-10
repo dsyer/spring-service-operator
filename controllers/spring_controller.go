@@ -75,6 +75,9 @@ func (r *ProxyServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	if err := r.checkFinalizers(proxy); err != nil {
 		return ctrl.Result{}, err
 	}
+	if !proxy.ObjectMeta.DeletionTimestamp.IsZero() {
+		return ctrl.Result{}, nil
+	}
 
 	deployment, _, err := r.createAndUpdateDeploymentAndService(req, *proxy)
 	if err != nil {

@@ -234,6 +234,7 @@ var _ = Describe("ProxyServiceReconciler", func() {
 			It("should not remove the finalizer", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(len(proxy.ObjectMeta.Finalizers)).To(Equal(1))
+				Expect(createCalls).To(Equal(3))
 			})
 	
 		})
@@ -247,6 +248,7 @@ var _ = Describe("ProxyServiceReconciler", func() {
 			It("should remove the finalizer", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(len(proxy.ObjectMeta.Finalizers)).To(Equal(0))
+				Expect(createCalls).To(Equal(0))
 			})
 	
 		})

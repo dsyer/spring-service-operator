@@ -5,16 +5,22 @@ upstream {{$key}} {
 {{end}}
 
 # map to different upstream backends based on header
-map $http_x_server_select $pool {
+map $http_cookie $pool {
 {{range $key, $value := .Mappings}}     {{$key}} "{{$value}}";
 {{end}}}
 
 server {
      listen 80;
      server_name example.com;
-     location / {
+     {{range $key, $value := .Choices}}location /choose/{{$key}} {
+          add_header  Set-Cookie "backend={{$value}};Path=/";
+          rewrite ^/.*$ $scheme://$http_host/ redirect;
+     }
+{{end}}     location / {
           proxy_pass http://$pool;
+          add_header  X-Server $pool;
 
+          proxy_set_header X-Server-Select $pool;
           #standard proxy settings
           proxy_set_header X-Real-IP $remote_addr;
           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

@@ -391,13 +391,16 @@ func readMap(path string, proxy api.ProxyService) map[string]string {
 	services := Services{
 		Upstreams: map[string]string{},
 		Mappings:  map[string]string{},
+		Choices:  map[string]string{},
 	}
 	for count, service := range proxy.Spec.Services {
 		if count == 0 {
+			services.Choices[""] = "default"
 			services.Mappings["default"] = service
 			services.Upstreams[service] = proxy.Name
 		} else {
-			services.Mappings[service] = service
+			services.Choices[service] = service
+			services.Mappings[fmt.Sprintf("~.*backend=%s.*",service)] = service
 			services.Upstreams[service] = service
 		}
 	}
@@ -432,6 +435,7 @@ func readMap(path string, proxy api.ProxyService) map[string]string {
 type Services struct {
 	Upstreams map[string]string
 	Mappings  map[string]string
+	Choices  map[string]string
 }
 
 func updateConfig(config *corev1.ConfigMap, proxy *api.ProxyService) *corev1.ConfigMap {

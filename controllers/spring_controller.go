@@ -392,10 +392,8 @@ func readMap(path string, proxy api.ProxyService) map[string]string {
 		Upstreams: map[string]string{},
 		Cookies:   map[string]string{},
 		Headers:   map[string]string{},
-		Mappings:  map[string]string{},
 		Choices:   map[string]string{},
 	}
-	services.Mappings["default"] = "cookies"
 	for count, service := range proxy.Spec.Services {
 		if count == 0 {
 			services.Choices[""] = service
@@ -408,7 +406,6 @@ func readMap(path string, proxy api.ProxyService) map[string]string {
 			services.Headers[service] = service
 			services.Upstreams[service] = service
 		}
-		services.Mappings[service] = "headers"
 	}
 	for _, file := range paths {
 		name := file.Name()
@@ -442,7 +439,6 @@ type Services struct {
 	Upstreams map[string]string
 	Cookies   map[string]string
 	Headers   map[string]string
-	Mappings  map[string]string
 	Choices   map[string]string
 }
 

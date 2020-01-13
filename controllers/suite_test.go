@@ -136,7 +136,7 @@ var _ = Describe("ProxyServiceReconciler", func() {
 			existingService = corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: testNamespace,
-					Name: "green",
+					Name:      "green",
 				},
 			}
 			get = func(ctx context.Context, objectKey client.ObjectKey, out runtime.Object) error {

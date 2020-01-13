@@ -49,7 +49,7 @@ The responses have headers that recor the routing decision:
 $ curl -v localhost:8080 -H "Cookie: backend=blue"
 ...
 < X-Server: blue
-< X-Route: cookie
+< X-Route: cookies
 ...
 ```
 

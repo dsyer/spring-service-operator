@@ -13,10 +13,10 @@ spec:
   - blue
 ```
 
-The result of applying this YAML is to create a new `Service` called `demo` that forwards HTTP requests to two existing services ("green" and "blue", which must exist). So set up a port forward:
+The result of applying this YAML is to replace the first `Service` (i.e. "green" in this example) with one that forwards HTTP requests to the existing services ("green" and "blue", which must exist). So set up a port forward:
 
 ```
-$ kubectl port-forward svc/demo 8080:80
+$ kubectl port-forward svc/green 8080:80
 Forwarding from 127.0.0.1:8080 -> 8080
 Forwarding from [::1]:8080 -> 8080
 ```

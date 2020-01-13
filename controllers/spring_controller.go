@@ -390,19 +390,25 @@ func readMap(path string, proxy api.ProxyService) map[string]string {
 	paths, _ := ioutil.ReadDir(path)
 	services := Services{
 		Upstreams: map[string]string{},
+		Cookies:   map[string]string{},
+		Headers:   map[string]string{},
 		Mappings:  map[string]string{},
-		Choices:  map[string]string{},
+		Choices:   map[string]string{},
 	}
+	services.Mappings["default"] = "cookies"
 	for count, service := range proxy.Spec.Services {
 		if count == 0 {
-			services.Choices[""] = "default"
-			services.Mappings["default"] = service
+			services.Choices[""] = service
+			services.Cookies["default"] = service
+			services.Headers["default"] = service
 			services.Upstreams[service] = proxy.Name
 		} else {
 			services.Choices[service] = service
-			services.Mappings[fmt.Sprintf("~.*backend=%s.*",service)] = service
+			services.Cookies[fmt.Sprintf("~.*backend=%s.*", service)] = service
+			services.Headers[service] = service
 			services.Upstreams[service] = service
 		}
+		services.Mappings[service] = "headers"
 	}
 	for _, file := range paths {
 		name := file.Name()
@@ -434,8 +440,10 @@ func readMap(path string, proxy api.ProxyService) map[string]string {
 // Services a convenience wrapper for the nginx config template
 type Services struct {
 	Upstreams map[string]string
+	Cookies   map[string]string
+	Headers   map[string]string
 	Mappings  map[string]string
-	Choices  map[string]string
+	Choices   map[string]string
 }
 
 func updateConfig(config *corev1.ConfigMap, proxy *api.ProxyService) *corev1.ConfigMap {
@@ -491,7 +499,7 @@ func copyExistingService(proxy *api.ProxyService, service corev1.Service) *corev
 			Namespace: proxy.Namespace,
 		},
 		Spec: corev1.ServiceSpec{
-			Ports: service.Spec.Ports,
+			Ports:    service.Spec.Ports,
 			Selector: service.Spec.Selector,
 		},
 	}

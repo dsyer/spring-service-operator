@@ -1,3 +1,11 @@
+upstream headers {
+     server 127.0.0.1:8000;
+}
+
+upstream cookies {
+     server 127.0.0.1:8001;
+}
+
 {{range $key, $value := .Upstreams}}
 upstream {{$key}} {
      server {{$value}};
@@ -5,24 +13,67 @@ upstream {{$key}} {
 {{end}}
 
 # map to different upstream backends based on header
-map $http_cookie $pool {
+map $http_cookie $cookie_pool {
+{{range $key, $value := .Cookies}}     {{$key}} "{{$value}}";
+{{end}}}
+
+map $http_x_server_select $server_pool {
+{{range $key, $value := .Headers}}     {{$key}} "{{$value}}";
+{{end}}}
+
+map $http_x_server_select $server_select {
 {{range $key, $value := .Mappings}}     {{$key}} "{{$value}}";
 {{end}}}
 
 server {
      listen 80;
-     server_name example.com;
+     server_name _;
+     location / {
+          proxy_pass http://$server_select;
+     }
+}
+
+server {
+     listen 8000;
+     server_name _;
+
+     location / {
+          proxy_pass http://$server_pool;
+          add_header  X-Server $server_pool;
+          add_header  X-Route header;
+
+          proxy_set_header X-Server-Select $server_pool;
+          #standard proxy settings
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_redirect off;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header Host $http_host;
+          proxy_redirect off;
+          proxy_set_header X-Forwarded-Proto $scheme;
+          proxy_set_header X-NginX-Proxy true;
+          proxy_connect_timeout 600;
+          proxy_send_timeout 600;
+          proxy_read_timeout 600;
+          send_timeout 600;
+     }
+}
+
+server {
+     listen 8001;
+     server_name _;
      {{range $key, $value := .Choices}}location /choose/{{$key}} {
           add_header  Set-Cookie "backend={{$value}};Path=/";
           rewrite ^/.*$ $scheme://$http_host/ redirect;
      }
 {{end}}     location / {
-          proxy_pass http://$pool;
-          add_header  X-Server $pool;
+          proxy_pass http://$cookie_pool;
+          add_header  X-Server $cookie_pool;
+          add_header  X-Route cookie;
 
-          proxy_set_header X-Server-Select $pool;
+          proxy_set_header X-Server-Select $cookie_pool;
           #standard proxy settings
           proxy_set_header X-Real-IP $remote_addr;
+          proxy_redirect off;
           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
           proxy_set_header Host $http_host;
           proxy_redirect off;

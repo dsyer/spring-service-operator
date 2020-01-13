@@ -29,6 +29,10 @@ map $http_x_server_select $server_select {
 server {
      listen 80;
      server_name _;
+     location ~ /choose/(?<route>(.*))$ {
+          add_header  Set-Cookie "backend=$route;Path=/";
+          rewrite ^/.*$ $scheme://$http_host/ redirect;
+     }
      location / {
           proxy_pass http://$server_select;
      }
@@ -62,10 +66,6 @@ server {
 server {
      listen 8001;
      server_name _;
-     location ~ /choose/(?<route>(.*))$ {
-          add_header  Set-Cookie "backend=$route;Path=/";
-          rewrite ^/.*$ $scheme://$http_host/ redirect;
-     }
      location / {
           proxy_pass http://$cookie_pool;
           add_header  X-Server $cookie_pool;

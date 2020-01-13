@@ -62,11 +62,11 @@ server {
 server {
      listen 8001;
      server_name _;
-     {{range $key, $value := .Choices}}location /choose/{{$key}} {
-          add_header  Set-Cookie "backend={{$value}};Path=/";
+     location ~ /choose/(?<route>(.*))$ {
+          add_header  Set-Cookie "backend=$route;Path=/";
           rewrite ^/.*$ $scheme://$http_host/ redirect;
      }
-{{end}}     location / {
+     location / {
           proxy_pass http://$cookie_pool;
           add_header  X-Server $cookie_pool;
           add_header  X-Route cookie;

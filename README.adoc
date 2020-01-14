@@ -1,6 +1,6 @@
 :toc:
 
-A Kubernetes operator for proxying HTTP services. Create a simple service quickly that proxies 1 or more other services, and control the traffic with an HTTP header.  you can deploy it to Kubernetes with just a few lines of YAML:
+A Kubernetes operator for proxying HTTP services. Create a simple service quickly that proxies 1 or more other services, and control the traffic with an HTTP header.  You can deploy it to Kubernetes with just a few lines of YAML:
 
 ```
 apiVersion: spring.io/v1
@@ -54,6 +54,8 @@ $ curl -v localhost:8080 -H "Cookie: backend=blue"
 ```
 
 In a browser there is an endpoint you can visit `/choose/{route}` to set the cookie.
+
+When you delete the `ProxyService` the original service is re-instated. The proxy is implemented with nginx so it's pretty lightweight.
 
 == Installation
 

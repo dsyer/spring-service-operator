@@ -43,7 +43,7 @@ $ curl localhost:8080
 Green
 ```
 
-The responses have headers that recor the routing decision:
+The responses have headers that record the routing decision:
 
 ```
 $ curl -v localhost:8080 -H "Cookie: backend=blue"
